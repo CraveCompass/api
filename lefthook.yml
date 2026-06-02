@@ -1,0 +1,14 @@
+commit-msg:
+  commands:
+    lint-commit-msg:
+      run: npx --yes commitlint --color --edit {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    go-fmt:
+      glob: "*.go"
+      run: go fmt ./...
+    go-vet:
+      glob: "*.go"
+      run: go vet ./...
