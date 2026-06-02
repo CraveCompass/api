@@ -1,0 +1,28 @@
+# .gitignore
+
+# Binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS Files
+.DS_Store
+
+# SECRETS & ENVIRONMENT VARIABLES
+.env
+*.pem
+*.key
