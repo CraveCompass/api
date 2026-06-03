@@ -16,6 +16,22 @@ import (
 	"github.com/joho/godotenv"
 )
 
+func enableCORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// TODO: In production, change "*" to "https://your-frontend-domain.com"
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 func main() {
 	_ = godotenv.Load()
 
@@ -47,13 +63,13 @@ func main() {
 	submitVoteUC := application.NewSubmitVoteUseCase(sessionRepo)
 
 	sessionHandler := apiHTTP.NewSessionHandler(createSessionUC)
-	wsHandler := ws.NewWSHandler(wsHub, submitVoteUC)
+	wsHandler := ws.NewWSHandler(wsHub, submitVoteUC, sessionRepo)
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/health", enableCORS(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"healthy"}`))
-	})
-	http.HandleFunc("/sessions", sessionHandler.HandleCreateRoom)
+	}))
+	http.HandleFunc("/sessions", enableCORS(sessionHandler.HandleCreateRoom))
 	http.HandleFunc("/ws", wsHandler.HandleConnection)
 
 	log.Fatal(http.ListenAndServe(":"+port, nil))

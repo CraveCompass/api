@@ -29,12 +29,14 @@ type ClientMessage struct {
 type WSHandler struct {
 	hub          *Hub
 	submitVoteUC *application.SubmitVoteUseCase
+	sessionRepo  application.SessionRepository
 }
 
-func NewWSHandler(hub *Hub, submitVoteUC *application.SubmitVoteUseCase) *WSHandler {
+func NewWSHandler(hub *Hub, submitVoteUC *application.SubmitVoteUseCase, sessionRepo application.SessionRepository) *WSHandler {
 	return &WSHandler{
 		hub:          hub,
 		submitVoteUC: submitVoteUC,
+		sessionRepo:  sessionRepo,
 	}
 }
 
@@ -57,16 +59,23 @@ func (h *WSHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	h.hub.AddClient(sessionID, conn)
 
+	session, err := h.sessionRepo.GetByID(context.Background(), sessionID)
+	if err == nil {
+		conn.WriteJSON(map[string]interface{}{
+			"event":    "SESSION_UPDATED",
+			"session":  session,
+			"is_match": session.MatchedID != "",
+		})
+	}
+
 	for {
 		_, messageBytes, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("Connection closed or read error: %v", err)
 			break
 		}
 
 		var msg ClientMessage
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
-			log.Printf("Invalid JSON payload received over socket: %v", err)
 			continue
 		}
 
@@ -80,7 +89,7 @@ func (h *WSHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 			updatedSession, isMatch, err := h.submitVoteUC.Execute(context.Background(), input)
 			if err != nil {
-				log.Printf("Error processing vote usecase: %v", err)
+				log.Printf("Error processing vote: %v", err)
 				continue
 			}
 
