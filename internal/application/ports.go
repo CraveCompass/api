@@ -8,6 +8,7 @@ import (
 
 type RestaurantRepository interface {
 	GetByLocation(ctx context.Context, lat, lon float64, radiusMeters int) ([]domain.Restaurant, error)
+	FetchAndSaveFromOSM(ctx context.Context, lat, lon float64, radiusMeters int) error
 }
 
 type SessionRepository interface {

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/CraveCompass/api/internal/domain"
@@ -37,6 +38,23 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 	restaurants, err := uc.restaurantRepo.GetByLocation(ctx, input.Latitude, input.Longitude, input.RadiusMeters)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(restaurants) < 5 {
+		log.Println("Not enough local restaurants found. Triggering OSM On-Demand Fetcher...")
+		err := uc.restaurantRepo.FetchAndSaveFromOSM(ctx, input.Latitude, input.Longitude, input.RadiusMeters)
+		if err != nil {
+			log.Printf("Warning: OSM Fetch failed: %v", err)
+		}
+
+		restaurants, err = uc.restaurantRepo.GetByLocation(ctx, input.Latitude, input.Longitude, input.RadiusMeters)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(restaurants) == 0 {
+		return nil, errors.New("no restaurants found in this area, try increasing the radius")
 	}
 
 	bytes := make([]byte, 4)

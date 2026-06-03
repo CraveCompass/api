@@ -59,3 +59,7 @@ func (r *InMemorySessionRepo) GetByID(ctx context.Context, id string) (*domain.S
 	}
 	return nil, nil
 }
+
+func (r *InMemoryRestaurantRepo) FetchAndSaveFromOSM(ctx context.Context, lat, lon float64, radiusMeters int) error {
+	return nil
+}
