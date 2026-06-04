@@ -61,7 +61,7 @@ func (h *WSHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	h.hub.AddClient(sessionID, conn)
 
 	session, err := h.sessionRepo.GetByID(context.Background(), sessionID)
-	if err == nil {
+	if err == nil && session != nil {
 		conn.WriteJSON(map[string]interface{}{
 			"event":    "SESSION_UPDATED",
 			"session":  session,

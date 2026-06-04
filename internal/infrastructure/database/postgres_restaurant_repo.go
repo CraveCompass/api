@@ -35,14 +35,14 @@ func NewPostgresRestaurantRepo(db *pgxpool.Pool) *PostgresRestaurantRepo {
 
 func (r *PostgresRestaurantRepo) GetByLocation(ctx context.Context, lat, lon float64, radiusMeters int) ([]domain.Restaurant, error) {
 	query := `
-		SELECT id, osm_id, name, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lon, cuisine_tags, price_tier, rating
+		SELECT id, osm_id, name, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lon, cuisine_tags, google_place_id, rating, user_ratings_total, price_level, photo_reference, formatted_address
 		FROM restaurants
 		WHERE ST_DWithin(
 			location, 
 			ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, 
 			$3
 		)
-		LIMIT 30; -- Cap the deck size to prevent massive payloads
+		LIMIT 30;
 	`
 
 	rows, err := r.db.Query(ctx, query, lon, lat, radiusMeters)
@@ -62,8 +62,12 @@ func (r *PostgresRestaurantRepo) GetByLocation(ctx context.Context, lat, lon flo
 			&rest.Latitude,
 			&rest.Longitude,
 			&rest.CuisineTags,
-			&rest.PriceTier,
+			&rest.GooglePlaceID,
 			&rest.Rating,
+			&rest.UserRatingsTotal,
+			&rest.PriceLevel,
+			&rest.PhotoReference,
+			&rest.FormattedAddress,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan restaurant row: %w", err)
 		}
@@ -145,4 +149,31 @@ func (r *PostgresRestaurantRepo) FetchAndSaveFromOSM(ctx context.Context, lat, l
 
 	log.Printf("Successfully cached %d new restaurants to PostGIS!", insertedCount)
 	return nil
+}
+
+func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string) error {
+	query := `
+		UPDATE restaurants
+		SET google_place_id = $2, 
+		    rating = $3, 
+		    user_ratings_total = $4, 
+		    price_level = $5, 
+		    photo_reference = $6, 
+		    formatted_address = $7
+		WHERE id = $1
+	`
+
+	_, err := r.db.Exec(
+		ctx,
+		query,
+		id,
+		googlePlaceID,
+		rating,
+		userRatingsTotal,
+		priceLevel,
+		photoReference,
+		formattedAddress,
+	)
+
+	return err
 }

@@ -21,12 +21,16 @@ type CreateSessionInput struct {
 type CreateSessionUseCase struct {
 	restaurantRepo RestaurantRepository
 	sessionRepo    SessionRepository
+	enrichUC       *EnrichRestaurantsUseCase
+	broadcaster    SessionBroadcaster
 }
 
-func NewCreateSessionUseCase(rr RestaurantRepository, sr SessionRepository) *CreateSessionUseCase {
+func NewCreateSessionUseCase(rr RestaurantRepository, sr SessionRepository, enrichUC *EnrichRestaurantsUseCase, broadcaster SessionBroadcaster) *CreateSessionUseCase {
 	return &CreateSessionUseCase{
 		restaurantRepo: rr,
 		sessionRepo:    sr,
+		enrichUC:       enrichUC,
+		broadcaster:    broadcaster,
 	}
 }
 
@@ -41,12 +45,10 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 	}
 
 	if len(restaurants) < 5 {
-		log.Println("Not enough local restaurants found. Triggering OSM On-Demand Fetcher...")
 		err := uc.restaurantRepo.FetchAndSaveFromOSM(ctx, input.Latitude, input.Longitude, input.RadiusMeters)
 		if err != nil {
 			log.Printf("Warning: OSM Fetch failed: %v", err)
 		}
-
 		restaurants, err = uc.restaurantRepo.GetByLocation(ctx, input.Latitude, input.Longitude, input.RadiusMeters)
 		if err != nil {
 			return nil, err
@@ -54,7 +56,7 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 	}
 
 	if len(restaurants) == 0 {
-		return nil, errors.New("no restaurants found in this area, try increasing the radius")
+		return nil, errors.New("no restaurants found in this area")
 	}
 
 	bytes := make([]byte, 4)
@@ -77,6 +79,10 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 
 	if err := uc.sessionRepo.Save(ctx, session); err != nil {
 		return nil, err
+	}
+
+	if uc.enrichUC != nil {
+		go uc.enrichUC.ExecuteAsynchronously(session, uc.broadcaster)
 	}
 
 	return session, nil

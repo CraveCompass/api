@@ -15,3 +15,11 @@ CREATE TABLE IF NOT EXISTS restaurants (
 -- Create a spatial index to make radius lookups blazingly fast
 CREATE INDEX IF NOT EXISTS idx_restaurants_location ON restaurants USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_restaurants_tags ON restaurants USING GIN (cuisine_tags);
+
+ALTER TABLE restaurants
+ADD COLUMN IF NOT EXISTS google_place_id VARCHAR(255),
+ADD COLUMN IF NOT EXISTS rating NUMERIC(3, 2),
+ADD COLUMN IF NOT EXISTS user_ratings_total INT,
+ADD COLUMN IF NOT EXISTS price_level INT,
+ADD COLUMN IF NOT EXISTS photo_reference TEXT,
+ADD COLUMN IF NOT EXISTS formatted_address TEXT;
