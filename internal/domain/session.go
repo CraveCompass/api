@@ -38,6 +38,11 @@ type Session struct {
 	CreatedAt    time.Time                      `json:"created_at"`
 }
 
+type SessionUpdatedEvent struct {
+	Event   string  `json:"event"`
+	Session Session `json:"session"`
+}
+
 func (s *Session) AddParticipant(p Participant) error {
 	if s.Status != StatusActive {
 		return errors.New("cannot join an inactive session")
