@@ -16,6 +16,10 @@ type CreateSessionInput struct {
 	Latitude     float64 `json:"latitude"`
 	Longitude    float64 `json:"longitude"`
 	RadiusMeters int     `json:"radius_meters"`
+
+	PriceTiers []int    `json:"price_tiers"`
+	MinRating  *float64 `json:"min_rating"`
+	Cuisines   []string `json:"cuisines"`
 }
 
 type CreateSessionUseCase struct {
@@ -39,7 +43,7 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 		return nil, errors.New("radius must be greater than zero")
 	}
 
-	restaurants, err := uc.restaurantRepo.GetByLocation(ctx, input.Latitude, input.Longitude, input.RadiusMeters)
+	restaurants, err := uc.restaurantRepo.GetByLocation(ctx, input.Latitude, input.Longitude, input.RadiusMeters, input.PriceTiers, input.MinRating, input.Cuisines)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +53,7 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 		if err != nil {
 			log.Printf("Warning: OSM Fetch failed: %v", err)
 		}
-		restaurants, err = uc.restaurantRepo.GetByLocation(ctx, input.Latitude, input.Longitude, input.RadiusMeters)
+		restaurants, err = uc.restaurantRepo.GetByLocation(ctx, input.Latitude, input.Longitude, input.RadiusMeters, input.PriceTiers, input.MinRating, input.Cuisines)
 		if err != nil {
 			return nil, err
 		}
@@ -65,6 +69,11 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 	}
 	sessionID := hex.EncodeToString(bytes)
 
+	minRatingVal := 0.0
+	if input.MinRating != nil {
+		minRatingVal = *input.MinRating
+	}
+
 	session := &domain.Session{
 		ID:           sessionID,
 		HostID:       input.HostID,
@@ -73,7 +82,12 @@ func (uc *CreateSessionUseCase) Execute(ctx context.Context, input CreateSession
 		Participants: []domain.Participant{
 			{ID: input.HostID, Username: "Host"},
 		},
-		Pool:      restaurants,
+		Pool: restaurants,
+		Filters: domain.SessionFilters{
+			PriceTiers: input.PriceTiers,
+			MinRating:  minRatingVal,
+			Cuisines:   input.Cuisines,
+		},
 		CreatedAt: time.Now(),
 	}
 

@@ -21,3 +21,6 @@ ADD COLUMN IF NOT EXISTS user_ratings_total INT,
 ADD COLUMN IF NOT EXISTS price_level INT,
 ADD COLUMN IF NOT EXISTS photo_reference TEXT,
 ADD COLUMN IF NOT EXISTS formatted_address TEXT;
+
+ALTER TABLE restaurants
+ADD COLUMN IF NOT EXISTS opening_hours TEXT[] DEFAULT '{}';

@@ -8,9 +8,10 @@ import (
 )
 
 type RestaurantRepository interface {
-	GetByLocation(ctx context.Context, lat, lon float64, radiusMeters int) ([]domain.Restaurant, error)
+	GetByLocation(ctx context.Context, lat, lon float64, radiusMeters int, priceTiers []int, minRating *float64, cuisines []string) ([]domain.Restaurant, error)
 	FetchAndSaveFromOSM(ctx context.Context, lat, lon float64, radiusMeters int) error
-	UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string, extraTags []string) error
+	UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string, extraTags []string, openingHours []string) error
+	GetUniqueCuisines(ctx context.Context) ([]string, error)
 }
 
 type SessionRepository interface {

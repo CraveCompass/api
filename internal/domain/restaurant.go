@@ -18,4 +18,5 @@ type Restaurant struct {
 	PriceLevel       *int     `json:"price_level,omitempty"`
 	PhotoReference   *string  `json:"photo_reference,omitempty"`
 	FormattedAddress *string  `json:"formatted_address,omitempty"`
+	OpeningHours     []string `json:"opening_hours,omitempty"`
 }

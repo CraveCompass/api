@@ -33,19 +33,44 @@ func NewPostgresRestaurantRepo(db *pgxpool.Pool) *PostgresRestaurantRepo {
 	}
 }
 
-func (r *PostgresRestaurantRepo) GetByLocation(ctx context.Context, lat, lon float64, radiusMeters int) ([]domain.Restaurant, error) {
+func (r *PostgresRestaurantRepo) GetByLocation(ctx context.Context, lat, lon float64, radiusMeters int, priceTiers []int, minRating *float64, cuisines []string) ([]domain.Restaurant, error) {
 	query := `
-		SELECT id, osm_id, name, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lon, cuisine_tags, google_place_id, rating, user_ratings_total, price_level, photo_reference, formatted_address
+		SELECT id, osm_id, name, ST_Y(location::geometry) as lat, ST_X(location::geometry) as lon, cuisine_tags, google_place_id, rating, user_ratings_total, price_level, photo_reference, formatted_address, opening_hours
 		FROM restaurants
 		WHERE ST_DWithin(
 			location, 
 			ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, 
 			$3
 		)
-		LIMIT 30;
 	`
 
-	rows, err := r.db.Query(ctx, query, lon, lat, radiusMeters)
+	args := []interface{}{lon, lat, radiusMeters}
+	argCount := 3
+
+	if len(priceTiers) > 0 {
+		argCount++
+		query += fmt.Sprintf(" AND (price_level = ANY($%d) OR price_tier = ANY($%d) OR price_level IS NULL)", argCount, argCount)
+		args = append(args, priceTiers)
+	}
+
+	if minRating != nil && *minRating > 0 {
+		argCount++
+		query += fmt.Sprintf(" AND (rating >= $%d OR rating IS NULL)", argCount)
+		args = append(args, *minRating)
+	}
+
+	if len(cuisines) > 0 {
+		argCount++
+		query += fmt.Sprintf(` AND EXISTS (
+			SELECT 1 FROM unnest(cuisine_tags) db_tag, unnest($%d::text[]) filter_tag 
+			WHERE db_tag ILIKE '%%' || filter_tag || '%%'
+		)`, argCount)
+		args = append(args, cuisines)
+	}
+
+	query += " LIMIT 30;"
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query restaurants: %w", err)
 	}
@@ -68,6 +93,7 @@ func (r *PostgresRestaurantRepo) GetByLocation(ctx context.Context, lat, lon flo
 			&rest.PriceLevel,
 			&rest.PhotoReference,
 			&rest.FormattedAddress,
+			&rest.OpeningHours,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan restaurant row: %w", err)
 		}
@@ -151,7 +177,7 @@ func (r *PostgresRestaurantRepo) FetchAndSaveFromOSM(ctx context.Context, lat, l
 	return nil
 }
 
-func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string, extraTags []string) error {
+func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string, extraTags []string, openingHours []string) error {
 	query := `
 		UPDATE restaurants
 		SET google_place_id = $2, 
@@ -161,6 +187,7 @@ func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id 
 		    photo_reference = $6, 
 		    formatted_address = $7
 			cuisine_tags = array_cat(cuisine_tags, $8)
+			opening_hours = $9
 		WHERE id = $1
 	`
 
@@ -175,7 +202,32 @@ func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id 
 		photoReference,
 		formattedAddress,
 		extraTags,
+		openingHours,
 	)
 
 	return err
+}
+
+func (r *PostgresRestaurantRepo) GetUniqueCuisines(ctx context.Context) ([]string, error) {
+	query := `
+		SELECT DISTINCT initcap(replace(tag, '_', ' '))
+		FROM (SELECT unnest(cuisine_tags) AS tag FROM restaurants) sub 
+		WHERE tag != '' 
+		ORDER BY 1 
+		LIMIT 50;
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err == nil {
+			tags = append(tags, tag)
+		}
+	}
+	return tags, nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -74,6 +75,15 @@ func main() {
 	}))
 	http.HandleFunc("/sessions", enableCORS(sessionHandler.HandleCreateRoom))
 	http.HandleFunc("/ws", wsHandler.HandleConnection)
+	http.HandleFunc("/tags", enableCORS(func(w http.ResponseWriter, r *http.Request) {
+		tags, err := restaurantRepo.GetUniqueCuisines(context.Background())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tags)
+	}))
 
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
