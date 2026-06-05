@@ -10,7 +10,7 @@ import (
 type RestaurantRepository interface {
 	GetByLocation(ctx context.Context, lat, lon float64, radiusMeters int) ([]domain.Restaurant, error)
 	FetchAndSaveFromOSM(ctx context.Context, lat, lon float64, radiusMeters int) error
-	UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string) error
+	UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string, extraTags []string) error
 }
 
 type SessionRepository interface {

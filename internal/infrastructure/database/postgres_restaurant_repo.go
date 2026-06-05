@@ -151,7 +151,7 @@ func (r *PostgresRestaurantRepo) FetchAndSaveFromOSM(ctx context.Context, lat, l
 	return nil
 }
 
-func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string) error {
+func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id string, googlePlaceID *string, rating *float64, userRatingsTotal *int, priceLevel *int, photoReference *string, formattedAddress *string, extraTags []string) error {
 	query := `
 		UPDATE restaurants
 		SET google_place_id = $2, 
@@ -160,6 +160,7 @@ func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id 
 		    price_level = $5, 
 		    photo_reference = $6, 
 		    formatted_address = $7
+			cuisine_tags = array_cat(cuisine_tags, $8)
 		WHERE id = $1
 	`
 
@@ -173,6 +174,7 @@ func (r *PostgresRestaurantRepo) UpdateGooglePlacesData(ctx context.Context, id 
 		priceLevel,
 		photoReference,
 		formattedAddress,
+		extraTags,
 	)
 
 	return err

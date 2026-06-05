@@ -29,6 +29,3 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/cravecompass/cravecompass-api:latest
-
-      - name: Trigger Dokploy Deployment
-        run: curl -s -X GET "${{ secrets.DOKPLOY_WEBHOOK_URL }}"

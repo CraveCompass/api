@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type GooglePlaceResult struct {
@@ -16,6 +17,7 @@ type GooglePlaceResult struct {
 	PriceLevel       *int
 	PhotoReference   *string
 	FormattedAddress *string
+	Tags             []string
 }
 
 type GooglePlacesClient struct {
@@ -29,20 +31,20 @@ func NewGooglePlacesClient() *GooglePlacesClient {
 }
 
 type searchTextRequest struct {
-	TextQuery    string       `json:"textQuery"`
-	LocationBias locationBias `json:"locationBias"`
+	TextQuery           string              `json:"textQuery"`
+	LocationRestriction locationRestriction `json:"locationRestriction"`
 }
 
-type locationBias struct {
-	Circle circle `json:"circle"`
+type locationRestriction struct {
+	Rectangle rectangle `json:"rectangle"`
 }
 
-type circle struct {
-	Center center  `json:"center"`
-	Radius float64 `json:"radius"`
+type rectangle struct {
+	Low  coordinates `json:"low"`
+	High coordinates `json:"high"`
 }
 
-type center struct {
+type coordinates struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 }
@@ -52,12 +54,13 @@ type searchTextResponse struct {
 }
 
 type place struct {
-	Id               string  `json:"id"`
-	Rating           float64 `json:"rating"`
-	UserRatingCount  int     `json:"userRatingCount"`
-	PriceLevel       string  `json:"priceLevel"`
-	FormattedAddress string  `json:"formattedAddress"`
-	Photos           []photo `json:"photos"`
+	Id               string   `json:"id"`
+	Rating           float64  `json:"rating"`
+	UserRatingCount  int      `json:"userRatingCount"`
+	PriceLevel       string   `json:"priceLevel"`
+	FormattedAddress string   `json:"formattedAddress"`
+	Types            []string `json:"types"`
+	Photos           []photo  `json:"photos"`
 }
 
 type photo struct {
@@ -71,15 +74,21 @@ func (c *GooglePlacesClient) FetchRestaurantDetails(ctx context.Context, name st
 
 	url := "https://places.googleapis.com/v1/places:searchText"
 
+	latOffset := 0.005
+	lonOffset := 0.005
+
 	reqBody := searchTextRequest{
 		TextQuery: name,
-		LocationBias: locationBias{
-			Circle: circle{
-				Center: center{
-					Latitude:  lat,
-					Longitude: lon,
+		LocationRestriction: locationRestriction{
+			Rectangle: rectangle{
+				Low: coordinates{
+					Latitude:  lat - latOffset,
+					Longitude: lon - lonOffset,
 				},
-				Radius: 100.0,
+				High: coordinates{
+					Latitude:  lat + latOffset,
+					Longitude: lon + lonOffset,
+				},
 			},
 		},
 	}
@@ -97,7 +106,7 @@ func (c *GooglePlacesClient) FetchRestaurantDetails(ctx context.Context, name st
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Goog-Api-Key", c.apiKey)
 
-	req.Header.Set("X-Goog-FieldMask", "places.id,places.rating,places.userRatingCount,places.priceLevel,places.photos,places.formattedAddress")
+	req.Header.Set("X-Goog-FieldMask", "places.id,places.rating,places.userRatingCount,places.priceLevel,places.photos,places.formattedAddress,places.types")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -145,6 +154,13 @@ func (c *GooglePlacesClient) FetchRestaurantDetails(ctx context.Context, name st
 
 	if p.FormattedAddress != "" {
 		result.FormattedAddress = &p.FormattedAddress
+	}
+
+	for _, t := range p.Types {
+		if t != "restaurant" && t != "food" && t != "point_of_interest" && t != "establishment" {
+			cleanTag := strings.ReplaceAll(t, "_", " ")
+			result.Tags = append(result.Tags, cleanTag)
+		}
 	}
 
 	return result, nil
