@@ -115,6 +115,69 @@ func (h *WSHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				"session":  updatedSession,
 				"is_match": isMatch,
 			})
+		} else if msg.Action == "RESOLVE_TIE" {
+			session, err := h.sessionRepo.GetByID(context.Background(), sessionID)
+			if err != nil {
+				continue
+			}
+
+			if session.HostID != msg.UserID {
+				log.Println("Unauthorized tie resolution attempt")
+				continue
+			}
+
+			session.Status = domain.StatusMatched
+			session.MatchedID = msg.RestaurantID
+
+			err = h.sessionRepo.Save(context.Background(), session)
+			if err != nil {
+				log.Printf("Failed to save resolved tie: %v", err)
+				continue
+			}
+
+			h.hub.Broadcast(sessionID, map[string]interface{}{
+				"event":    "SESSION_UPDATED",
+				"session":  session,
+				"is_match": true,
+			})
+		} else if msg.Action == "START_SECOND_ROUND" {
+			session, err := h.sessionRepo.GetByID(context.Background(), sessionID)
+			if err != nil {
+				continue
+			}
+
+			if session.HostID != msg.UserID {
+				log.Println("Unauthorized second round attempt")
+				continue
+			}
+
+			var newPool []domain.Restaurant
+			for _, rest := range session.Pool {
+				for _, tiedID := range session.TiedIDs {
+					if rest.ID == tiedID {
+						newPool = append(newPool, rest)
+						break
+					}
+				}
+			}
+
+			session.Pool = newPool
+			session.Votes = make(map[string]map[string]domain.VoteType)
+			session.Status = domain.StatusActive
+			session.TiedIDs = nil
+			session.MatchedID = ""
+
+			err = h.sessionRepo.Save(context.Background(), session)
+			if err != nil {
+				log.Printf("Failed to start second round: %v", err)
+				continue
+			}
+
+			h.hub.Broadcast(sessionID, map[string]interface{}{
+				"event":    "SESSION_UPDATED",
+				"session":  session,
+				"is_match": false,
+			})
 		}
 	}
 }
