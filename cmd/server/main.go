@@ -10,6 +10,7 @@ import (
 	"github.com/CraveCompass/api/internal/application"
 	"github.com/CraveCompass/api/internal/infrastructure/database"
 	"github.com/CraveCompass/api/internal/infrastructure/memory"
+	"github.com/CraveCompass/api/internal/infrastructure/places"
 	apiHTTP "github.com/CraveCompass/api/internal/interfaces/http"
 	"github.com/CraveCompass/api/internal/interfaces/ws"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -57,9 +58,11 @@ func main() {
 
 	restaurantRepo := database.NewPostgresRestaurantRepo(dbPool)
 	sessionRepo := memory.NewInMemorySessionRepo()
+	placesClient := places.NewGooglePlacesClient()
 	wsHub := ws.NewHub()
 
-	createSessionUC := application.NewCreateSessionUseCase(restaurantRepo, sessionRepo)
+	enrichUC := application.NewEnrichRestaurantsUseCase(restaurantRepo, placesClient)
+	createSessionUC := application.NewCreateSessionUseCase(restaurantRepo, sessionRepo, enrichUC, wsHub)
 	submitVoteUC := application.NewSubmitVoteUseCase(sessionRepo)
 
 	sessionHandler := apiHTTP.NewSessionHandler(createSessionUC)
