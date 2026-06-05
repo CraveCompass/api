@@ -18,6 +18,7 @@ type GooglePlaceResult struct {
 	PhotoReference   *string
 	FormattedAddress *string
 	Tags             []string
+	OpeningHours     []string
 }
 
 type GooglePlacesClient struct {
@@ -54,17 +55,22 @@ type searchTextResponse struct {
 }
 
 type place struct {
-	Id               string   `json:"id"`
-	Rating           float64  `json:"rating"`
-	UserRatingCount  int      `json:"userRatingCount"`
-	PriceLevel       string   `json:"priceLevel"`
-	FormattedAddress string   `json:"formattedAddress"`
-	Types            []string `json:"types"`
-	Photos           []photo  `json:"photos"`
+	Id                  string              `json:"id"`
+	Rating              float64             `json:"rating"`
+	UserRatingCount     int                 `json:"userRatingCount"`
+	PriceLevel          string              `json:"priceLevel"`
+	FormattedAddress    string              `json:"formattedAddress"`
+	Types               []string            `json:"types"`
+	Photos              []photo             `json:"photos"`
+	RegularOpeningHours regularOpeningHours `json:"regularOpeningHours"`
 }
 
 type photo struct {
 	Name string `json:"name"`
+}
+
+type regularOpeningHours struct {
+	WeekdayDescriptions []string `json:"weekdayDescriptions"`
 }
 
 func (c *GooglePlacesClient) FetchRestaurantDetails(ctx context.Context, name string, lat, lon float64) (*GooglePlaceResult, error) {
@@ -106,8 +112,7 @@ func (c *GooglePlacesClient) FetchRestaurantDetails(ctx context.Context, name st
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Goog-Api-Key", c.apiKey)
 
-	req.Header.Set("X-Goog-FieldMask", "places.id,places.rating,places.userRatingCount,places.priceLevel,places.photos,places.formattedAddress,places.types")
-
+	req.Header.Set("X-Goog-FieldMask", "places.id,places.rating,places.userRatingCount,places.priceLevel,places.photos,places.formattedAddress,places.types,places.regularOpeningHours.weekdayDescriptions")
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -161,6 +166,10 @@ func (c *GooglePlacesClient) FetchRestaurantDetails(ctx context.Context, name st
 			cleanTag := strings.ReplaceAll(t, "_", " ")
 			result.Tags = append(result.Tags, cleanTag)
 		}
+	}
+
+	if len(p.RegularOpeningHours.WeekdayDescriptions) > 0 {
+		result.OpeningHours = p.RegularOpeningHours.WeekdayDescriptions
 	}
 
 	return result, nil

@@ -52,7 +52,7 @@ func (uc *EnrichRestaurantsUseCase) ExecuteAsynchronously(session *domain.Sessio
 			}
 
 			_ = uc.restaurantRepo.UpdateGooglePlacesData(
-				ctx, rest.ID, &details.ID, details.Rating, details.UserRatingsTotal, details.PriceLevel, details.PhotoReference, details.FormattedAddress, details.Tags,
+				ctx, rest.ID, &details.ID, details.Rating, details.UserRatingsTotal, details.PriceLevel, details.PhotoReference, details.FormattedAddress, details.Tags, details.OpeningHours,
 			)
 
 			session.Pool[index].GooglePlaceID = &details.ID
@@ -63,6 +63,7 @@ func (uc *EnrichRestaurantsUseCase) ExecuteAsynchronously(session *domain.Sessio
 			session.Pool[index].PhotoReference = details.PhotoReference
 			session.Pool[index].FormattedAddress = details.FormattedAddress
 			session.Pool[index].CuisineTags = append(session.Pool[index].CuisineTags, details.Tags...)
+			session.Pool[index].OpeningHours = details.OpeningHours
 
 			if broadcaster != nil {
 				broadcaster.Broadcast(session.ID, map[string]interface{}{

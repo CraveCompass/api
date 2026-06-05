@@ -27,6 +27,12 @@ type Participant struct {
 	Username string `json:"username"`
 }
 
+type SessionFilters struct {
+	PriceTiers []int    `json:"price_tiers"`
+	MinRating  float64  `json:"min_rating"`
+	Cuisines   []string `json:"cuisines"`
+}
+
 type Session struct {
 	ID           string                         `json:"id"`
 	HostID       string                         `json:"host_id"`
@@ -37,6 +43,7 @@ type Session struct {
 	MatchedID    string                         `json:"matched_id,omitempty"`
 	Votes        map[string]map[string]VoteType `json:"votes"`
 	TiedIDs      []string                       `json:"tied_ids,omitempty"`
+	Filters      SessionFilters                 `json:"filters"`
 	CreatedAt    time.Time                      `json:"created_at"`
 }
 
