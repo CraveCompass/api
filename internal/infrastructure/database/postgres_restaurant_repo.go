@@ -222,7 +222,7 @@ func (r *PostgresRestaurantRepo) GetUniqueCuisines(ctx context.Context) ([]strin
 	}
 	defer rows.Close()
 
-	var tags []string
+	tags := []string{}
 	for rows.Next() {
 		var tag string
 		if err := rows.Scan(&tag); err == nil {
