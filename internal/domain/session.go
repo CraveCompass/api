@@ -8,9 +8,10 @@ import (
 type SessionStatus string
 
 const (
-	StatusActive   SessionStatus = "ACTIVE"
-	StatusMatched  SessionStatus = "MATCHED"
-	StatusFinished SessionStatus = "FINISHED"
+	StatusActive         SessionStatus = "ACTIVE"
+	StatusMatched        SessionStatus = "MATCHED"
+	StatusFinished       SessionStatus = "FINISHED"
+	StatusHostTieBreaker SessionStatus = "HOST_TIE_BREAKER"
 )
 
 type VoteType string
@@ -35,6 +36,7 @@ type Session struct {
 	Pool         []Restaurant                   `json:"pool"`
 	MatchedID    string                         `json:"matched_id,omitempty"`
 	Votes        map[string]map[string]VoteType `json:"votes"`
+	TiedIDs      []string                       `json:"tied_ids,omitempty"`
 	CreatedAt    time.Time                      `json:"created_at"`
 }
 
@@ -70,7 +72,15 @@ func (s *Session) RecordVote(userID, restaurantID string, vote VoteType) (bool, 
 
 	s.Votes[restaurantID][userID] = vote
 
-	return s.CheckConsensus(restaurantID), nil
+	if s.CheckConsensus(restaurantID) {
+		return true, nil
+	}
+
+	if s.CheckCompletionFallback() {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s *Session) CheckConsensus(restaurantID string) bool {
@@ -88,6 +98,54 @@ func (s *Session) CheckConsensus(restaurantID string) bool {
 	if likesCount == len(s.Participants) && likesCount > 0 {
 		s.Status = StatusMatched
 		s.MatchedID = restaurantID
+		return true
+	}
+
+	return false
+}
+
+func (s *Session) CheckCompletionFallback() bool {
+	totalExpectedVotes := len(s.Participants) * len(s.Pool)
+	totalCastVotes := 0
+
+	for _, userVotes := range s.Votes {
+		totalCastVotes += len(userVotes)
+	}
+
+	if totalCastVotes < totalExpectedVotes || totalExpectedVotes == 0 {
+		return false
+	}
+
+	bestScore := -9999
+	var tiedIDs []string
+
+	for restID, userVotes := range s.Votes {
+		score := 0
+		for _, vote := range userVotes {
+			if vote == VoteLike {
+				score += 1
+			} else if vote == VoteSuperLike {
+				score += 2
+			} else if vote == VoteDislike {
+				score -= 1
+			}
+		}
+
+		if score > bestScore {
+			bestScore = score
+			tiedIDs = []string{restID}
+		} else if score == bestScore {
+			tiedIDs = append(tiedIDs, restID)
+		}
+	}
+
+	if len(tiedIDs) == 1 {
+		s.Status = StatusMatched
+		s.MatchedID = tiedIDs[0]
+		return true
+	} else if len(tiedIDs) > 1 {
+		s.Status = StatusHostTieBreaker
+		s.TiedIDs = tiedIDs
 		return true
 	}
 
